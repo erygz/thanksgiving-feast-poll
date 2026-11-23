@@ -208,15 +208,11 @@
 </style>
 
 <script>
-  // Replace these two placeholders with your Supabase values.
+  // Supabase connection
   const SUPABASE_URL = "https://xleoaefvguugtjfcchdc.supabase.co";
   const SUPABASE_KEY = "sb_publishable_xdRpx7Fsuwzq-CWB8ivcMA_pngaAxWL";
 
-   const client = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
-  );
-
+  // Page elements
   const optionsContainer = document.getElementById("options");
   const voteButton = document.getElementById("voteButton");
   const status = document.getElementById("status");
@@ -228,88 +224,117 @@
   let loading = false;
   let optionsRendered = false;
 
+  // Check whether the Supabase library loaded
+  if (!window.supabase || !window.supabase.createClient) {
+    status.textContent =
+      "The poll service could not load. Please refresh or try another browser.";
+
+    console.error("Supabase JavaScript library is unavailable.");
+    voteButton.disabled = true;
+
+    throw new Error("Supabase library failed to load.");
+  }
+
+  // Connect to Supabase
+  const client = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+  // Create HTML elements safely
   function makeElement(tag, className, text) {
     const element = document.createElement(tag);
+
     if (className) element.className = className;
     if (text !== undefined) element.textContent = text;
+
     return element;
   }
 
- function renderOptions() {
-  const legend = optionsContainer.querySelector("legend");
-  optionsContainer.replaceChildren();
-
+  // Display voting choices
   function renderOptions() {
-  const legend = optionsContainer.querySelector("legend");
+    const legend = optionsContainer.querySelector("legend");
 
-  optionsContainer.replaceChildren();
+    optionsContainer.replaceChildren();
 
-  // Preserve the accessibility label
-  if (legend) {
-    optionsContainer.appendChild(legend);
+    // Preserve accessibility label
+    if (legend) {
+      optionsContainer.appendChild(legend);
+    }
+
+    options.forEach(option => {
+      const label = makeElement("label", "option");
+      const radio = document.createElement("input");
+
+      radio.type = "radio";
+      radio.name = "pollChoice";
+      radio.value = option.id;
+      radio.required = true;
+
+      label.append(
+        radio,
+        document.createTextNode(option.label)
+      );
+
+      optionsContainer.appendChild(label);
+    });
   }
 
-  // Create the voting choices
-  options.forEach(option => {
-    const label = makeElement("label", "option");
-    const radio = document.createElement("input");
-
-    radio.type = "radio";
-    radio.name = "pollChoice";
-    radio.value = option.id;
-    radio.required = true;
-
-    label.append(
-      radio,
-      document.createTextNode(option.label)
-    );
-
-    optionsContainer.appendChild(label);
-  });
-}
-
+  // Retrieve results from Supabase
   async function loadResults() {
     if (loading) return;
+
     loading = true;
 
     try {
       const { data, error } = await client.rpc("get_poll_results");
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       if (!data || data.length === 0) {
-        status.textContent = "No poll options found.";
+        status.textContent = "No poll options were found.";
         return;
       }
 
       options = data;
 
-     if (!optionsRendered) {
-  renderOptions();
-  optionsRendered = true;
-  voteButton.disabled = false;
-}
+      // Render voting choices only once
+      if (!optionsRendered) {
+        renderOptions();
+        optionsRendered = true;
+        voteButton.disabled = false;
+      }
 
       renderResults();
 
     } catch (error) {
-      console.error(error);
-      status.textContent = "Unable to refresh results. Please try again.";
+      console.error("Poll loading error:", error);
+
+      status.textContent =
+        "Unable to load poll results. Please try refreshing the page.";
+
     } finally {
       loading = false;
     }
   }
 
+  // Display live results
   function renderResults() {
     const total = options.reduce(
-      (sum, option) => sum + Number(option.votes), 0
+      (sum, option) => sum + Number(option.votes),
+      0
     );
 
     resultRows.replaceChildren();
 
     options.forEach(option => {
       const votes = Number(option.votes);
-      const percentage = total > 0 ? votes / total * 100 : 0;
+
+      const percentage = total > 0
+        ? (votes / total) * 100
+        : 0;
 
       const row = makeElement("div", "result-row");
       const heading = makeElement("div", "result-heading");
@@ -317,12 +342,14 @@
       heading.append(
         makeElement("span", "", option.label),
         makeElement(
-          "span", "",
+          "span",
+          "",
           `${votes} votes · ${percentage.toFixed(1)}%`
         )
       );
 
       const track = makeElement("div", "track");
+
       track.setAttribute("role", "progressbar");
       track.setAttribute("aria-label", `${option.label} votes`);
       track.setAttribute("aria-valuemin", "0");
@@ -330,18 +357,23 @@
       track.setAttribute("aria-valuenow", percentage.toFixed(1));
 
       const bar = makeElement("div", "bar");
+
       bar.style.width = `${percentage}%`;
 
       track.appendChild(bar);
       row.append(heading, track);
+
       resultRows.appendChild(row);
     });
 
     totalVotes.textContent = `Total votes: ${total}`;
+
     resultsSection.style.display = "block";
   }
 
-  document.getElementById("pollForm").addEventListener("submit",
+  // Record student votes
+  document.getElementById("pollForm").addEventListener(
+    "submit",
     async event => {
       event.preventDefault();
 
@@ -350,7 +382,9 @@
       );
 
       if (!selected) {
-        status.textContent = "Please select an option first.";
+        status.textContent =
+          "Please select an option before voting.";
+
         return;
       }
 
@@ -362,24 +396,36 @@
           p_option_id: selected.value
         });
 
-        if (error || !data || data.length === 0) {
-          throw error || new Error("Vote was not recorded.");
+        if (error) {
+          throw error;
         }
 
-        status.textContent = "Thank you! Your vote has been counted. 🧡";
+        if (!data || data.length === 0) {
+          throw new Error("Vote was not recorded.");
+        }
 
+        status.textContent =
+          "Thank you! Your vote has been counted. 🧡";
+
+        // Retrieve updated totals
         await loadResults();
 
       } catch (error) {
-        console.error(error);
-        status.textContent = "Your vote could not be recorded. Please try again.";
+        console.error("Voting error:", error);
+
+        status.textContent =
+          "Your vote could not be recorded. Please try again.";
+
       } finally {
         voteButton.disabled = false;
       }
     }
   );
 
-  // Display results immediately and refresh for everyone.
+  // Initial poll loading
   loadResults();
+
+  // Refresh results every five seconds for everyone
   setInterval(loadResults, 5000);
+
 </script>
