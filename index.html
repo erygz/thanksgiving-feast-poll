@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thanksgiving Feast Poll</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 30px 16px;
+      font-family: Arial, sans-serif;
+      background: #f8f1e7;
+      color: #443629;
+    }
+
+    .container {
+      max-width: 650px;
+      margin: 20px auto;
+      background: #fffdf9;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(70,45,20,.12);
+    }
+
+    header {
+      text-align: center;
+      padding: 35px 20px;
+      color: white;
+      background: linear-gradient(135deg, #a94f27, #d28b3e);
+    }
+
+    header .icon { font-size: 42px; }
+    h1 { margin: 10px 0; font-size: 30px; }
+    header p { margin: 0; }
+
+    main { padding: 28px; }
+
+    .intro {
+      text-align: center;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    h2 { font-size: 21px; }
+
+    .option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 15px;
+      margin: 10px 0;
+      border: 2px solid #eadbc9;
+      border-radius: 12px;
+      cursor: pointer;
+      background: white;
+      transition: border-color .2s, background .2s;
+    }
+
+    .option:has(input:checked) {
+      border-color: #b65c2d;
+      background: #fff5e9;
+    }
+
+    .option input {
+      width: 19px;
+      height: 19px;
+      accent-color: #a94f27;
+    }
+
+    .option:focus-within {
+      outline: 3px solid #356c9a;
+      outline-offset: 3px;
+    }
+
+    button {
+      width: 100%;
+      padding: 15px;
+      margin-top: 18px;
+      border: 0;
+      border-radius: 12px;
+      background: #a94f27;
+      color: white;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover { background: #873d20; }
+    button:disabled { opacity: .6; cursor: wait; }
+
+    #status {
+      min-height: 24px;
+      margin-top: 14px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    #results { display: none; margin-top: 32px; }
+
+    .result-row { margin: 18px 0; }
+
+    .result-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 7px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .track {
+      height: 13px;
+      border-radius: 20px;
+      background: #eee4d8;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0;
+      background: #c77936;
+      border-radius: 20px;
+      transition: width .4s ease;
+    }
+
+    .total {
+      text-align: center;
+      color: #775a40;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+
+    footer {
+      text-align: center;
+      padding: 18px;
+      background: #f5eadb;
+      font-size: 13px;
+      color: #70583f;
+    }
+
+    @media (max-width: 480px) {
+      main { padding: 20px; }
+      h1 { font-size: 25px; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="container">
+
+  <header>
+    <div class="icon" aria-hidden="true">🍂 🦃 🍁</div>
+    <h1>Thanksgiving Feast Poll</h1>
+    <p>Let's settle the Thanksgiving debate!</p>
+  </header>
+
+  <main>
+    <div class="intro">
+      <h2>What's your favorite Thanksgiving side dish?</h2>
+      <p>Choose your favorite and cast your vote!</p>
+      <p><strong>You can vote as many times as you like.</strong></p>
+    </div>
+
+    <form id="pollForm">
+      <fieldset id="options" style="border:0;padding:0;margin:0">
+        <legend class="sr-only">Choose your favorite Thanksgiving side dish</legend>
+        <p id="loading">Loading the poll...</p>
+      </fieldset>
+      <button id="voteButton" type="submit" disabled>
+        Cast My Vote
+      </button>
+    </form>
+
+    <p id="status" role="status" aria-live="polite"></p>
+
+    <section id="results" aria-label="Live poll results">
+      <h2>🍁 Current Results</h2>
+      <div id="resultRows"></div>
+      <p class="total" id="totalVotes"></p>
+      <p style="text-align:center;font-size:13px;color:#775a40">
+        Results automatically refresh while you're viewing them.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    Made for a little Thanksgiving fun! 🧡
+  </footer>
+</div>
+
+<style>
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
+
+<script>
+  // Replace these two placeholders with your Supabase values.
+  const SUPABASE_URL = "https://xleoaefvguugtjfcchdc.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_xdRpx7Fsuwzq-CWB8ivcMA_pngaAxWL";
+
+  const client = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+  const optionsContainer = document.getElementById("options");
+  const voteButton = document.getElementById("voteButton");
+  const status = document.getElementById("status");
+  const resultsSection = document.getElementById("results");
+  const resultRows = document.getElementById("resultRows");
+  const totalVotes = document.getElementById("totalVotes");
+
+  let hasVoted = false;
+  let options = [];
+
+  function makeElement(tag, className, text) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (text !== undefined) element.textContent = text;
+    return element;
+  }
+
+  function renderOptions() {
+    optionsContainer.replaceChildren();
+
+    options.forEach(option => {
+      const label = makeElement("label", "option");
+      const radio = document.createElement("input");
+
+      radio.type = "radio";
+      radio.name = "pollChoice";
+      radio.value = option.id;
+      radio.required = true;
+
+      label.append(radio, document.createTextNode(option.label));
+      optionsContainer.appendChild(label);
+    });
+  }
+
+  async function loadResults() {
+    const { data, error } = await client.rpc("get_poll_results");
+
+    if (error) {
+      status.textContent = "Unable to load results. Please refresh the page.";
+      console.error(error);
+      return;
+    }
+
+    options = data || [];
+
+    if (options.length === 0) {
+      status.textContent = "No poll options were found.";
+      return;
+    }
+
+    renderOptions();
+
+    if (hasVoted) renderResults();
+    voteButton.disabled = false;
+  }
+
+  function renderResults() {
+    const total = options.reduce(
+      (sum, option) => sum + Number(option.votes), 0
+    );
+
+    resultRows.replaceChildren();
+
+    options.forEach(option => {
+      const votes = Number(option.votes);
+      const percentage = total > 0
+        ? (votes / total) * 100
+        : 0;
+
+      const row = makeElement("div", "result-row");
+      const heading = makeElement("div", "result-heading");
+
+      heading.append(
+        makeElement("span", "", option.label),
+        makeElement("span", "", `${votes} votes · ${percentage.toFixed(1)}%`)
+      );
+
+      const track = makeElement("div", "track");
+      track.setAttribute("role", "progressbar");
+      track.setAttribute("aria-label", `${option.label} votes`);
+      track.setAttribute("aria-valuemin", "0");
+      track.setAttribute("aria-valuemax", "100");
+      track.setAttribute("aria-valuenow", percentage.toFixed(1));
+
+      const bar = makeElement("div", "bar");
+      bar.style.width = `${percentage}%`;
+
+      track.appendChild(bar);
+      row.append(heading, track);
+      resultRows.appendChild(row);
+    });
+
+    totalVotes.textContent = `Total votes: ${total}`;
+    resultsSection.style.display = "block";
+  }
+
+  document.getElementById("pollForm").addEventListener("submit",
+    async event => {
+      event.preventDefault();
+
+      const selected = document.querySelector(
+        'input[name="pollChoice"]:checked'
+      );
+
+      if (!selected) {
+        status.textContent = "Please select an option first.";
+        return;
+      }
+
+      voteButton.disabled = true;
+      status.textContent = "Recording your vote...";
+
+      const { data, error } = await client.rpc("cast_vote", {
+        p_option_id: selected.value
+      });
+
+      if (error || !data || data.length === 0) {
+        status.textContent = "Your vote could not be recorded. Please try again.";
+        console.error(error);
+        voteButton.disabled = false;
+        return;
+      }
+
+      hasVoted = true;
+      status.textContent = "Thank you! Your vote has been counted. 🧡";
+
+      await loadResults();
+      voteButton.disabled = false;
+    }
+  );
+
+  // Load the poll and refresh results every five seconds
+  // after the student has voted.
+  loadResults();
+  setInterval(() => {
+    if (hasVoted) loadResults();
+  }, 5000);
+</script>
+</body>
+</html>
