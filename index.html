@@ -239,23 +239,34 @@
   const legend = optionsContainer.querySelector("legend");
   optionsContainer.replaceChildren();
 
+  function renderOptions() {
+  const legend = optionsContainer.querySelector("legend");
+
+  optionsContainer.replaceChildren();
+
+  // Preserve the accessibility label
   if (legend) {
     optionsContainer.appendChild(legend);
   }
 
+  // Create the voting choices
   options.forEach(option => {
-      const label = makeElement("label", "option");
-      const radio = document.createElement("input");
+    const label = makeElement("label", "option");
+    const radio = document.createElement("input");
 
-      radio.type = "radio";
-      radio.name = "pollChoice";
-      radio.value = option.id;
-      radio.required = true;
+    radio.type = "radio";
+    radio.name = "pollChoice";
+    radio.value = option.id;
+    radio.required = true;
 
-      label.append(radio, document.createTextNode(option.label));
-      optionsContainer.appendChild(label);
-    });
-  }
+    label.append(
+      radio,
+      document.createTextNode(option.label)
+    );
+
+    optionsContainer.appendChild(label);
+  });
+}
 
   async function loadResults() {
     if (loading) return;
