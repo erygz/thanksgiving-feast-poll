@@ -212,7 +212,7 @@
   const SUPABASE_URL = "https://xleoaefvguugtjfcchdc.supabase.co";
   const SUPABASE_KEY = "sb_publishable_xdRpx7Fsuwzq-CWB8ivcMA_pngaAxWL";
 
-  const client = window.supabase.createClient(
+   const client = window.supabase.createClient(
     SUPABASE_URL,
     SUPABASE_KEY
   );
@@ -224,8 +224,8 @@
   const resultRows = document.getElementById("resultRows");
   const totalVotes = document.getElementById("totalVotes");
 
-  let hasVoted = false;
   let options = [];
+  let loading = false;
 
   function makeElement(tag, className, text) {
     const element = document.createElement(tag);
@@ -252,25 +252,34 @@
   }
 
   async function loadResults() {
-    const { data, error } = await client.rpc("get_poll_results");
+    if (loading) return;
+    loading = true;
 
-    if (error) {
-      status.textContent = "Unable to load results. Please refresh the page.";
+    try {
+      const { data, error } = await client.rpc("get_poll_results");
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        status.textContent = "No poll options found.";
+        return;
+      }
+
+      options = data;
+
+      if (optionsContainer.children.length === 0) {
+        renderOptions();
+        voteButton.disabled = false;
+      }
+
+      renderResults();
+
+    } catch (error) {
       console.error(error);
-      return;
+      status.textContent = "Unable to refresh results. Please try again.";
+    } finally {
+      loading = false;
     }
-
-    options = data || [];
-
-    if (options.length === 0) {
-      status.textContent = "No poll options were found.";
-      return;
-    }
-
-    renderOptions();
-
-    if (hasVoted) renderResults();
-    voteButton.disabled = false;
   }
 
   function renderResults() {
@@ -282,16 +291,17 @@
 
     options.forEach(option => {
       const votes = Number(option.votes);
-      const percentage = total > 0
-        ? (votes / total) * 100
-        : 0;
+      const percentage = total > 0 ? votes / total * 100 : 0;
 
       const row = makeElement("div", "result-row");
       const heading = makeElement("div", "result-heading");
 
       heading.append(
         makeElement("span", "", option.label),
-        makeElement("span", "", `${votes} votes · ${percentage.toFixed(1)}%`)
+        makeElement(
+          "span", "",
+          `${votes} votes · ${percentage.toFixed(1)}%`
+        )
       );
 
       const track = makeElement("div", "track");
@@ -329,31 +339,29 @@
       voteButton.disabled = true;
       status.textContent = "Recording your vote...";
 
-      const { data, error } = await client.rpc("cast_vote", {
-        p_option_id: selected.value
-      });
+      try {
+        const { data, error } = await client.rpc("cast_vote", {
+          p_option_id: selected.value
+        });
 
-      if (error || !data || data.length === 0) {
-        status.textContent = "Your vote could not be recorded. Please try again.";
+        if (error || !data || data.length === 0) {
+          throw error || new Error("Vote was not recorded.");
+        }
+
+        status.textContent = "Thank you! Your vote has been counted. 🧡";
+
+        await loadResults();
+
+      } catch (error) {
         console.error(error);
+        status.textContent = "Your vote could not be recorded. Please try again.";
+      } finally {
         voteButton.disabled = false;
-        return;
       }
-
-      hasVoted = true;
-      status.textContent = "Thank you! Your vote has been counted. 🧡";
-
-      await loadResults();
-      voteButton.disabled = false;
     }
   );
 
-  // Load the poll and refresh results every five seconds
-  // after the student has voted.
+  // Display results immediately and refresh for everyone.
   loadResults();
-  setInterval(() => {
-    if (hasVoted) loadResults();
-  }, 5000);
+  setInterval(loadResults, 5000);
 </script>
-</body>
-</html>
