@@ -226,6 +226,7 @@
 
   let options = [];
   let loading = false;
+  let optionsRendered = false;
 
   function makeElement(tag, className, text) {
     const element = document.createElement(tag);
@@ -234,10 +235,15 @@
     return element;
   }
 
-  function renderOptions() {
-    optionsContainer.replaceChildren();
+ function renderOptions() {
+  const legend = optionsContainer.querySelector("legend");
+  optionsContainer.replaceChildren();
 
-    options.forEach(option => {
+  if (legend) {
+    optionsContainer.appendChild(legend);
+  }
+
+  options.forEach(option => {
       const label = makeElement("label", "option");
       const radio = document.createElement("input");
 
@@ -267,10 +273,11 @@
 
       options = data;
 
-      if (optionsContainer.children.length === 0) {
-        renderOptions();
-        voteButton.disabled = false;
-      }
+     if (!optionsRendered) {
+  renderOptions();
+  optionsRendered = true;
+  voteButton.disabled = false;
+}
 
       renderResults();
 
